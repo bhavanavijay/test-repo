@@ -1,0 +1,328 @@
+---
+title: "STAS380 Exercise 1"
+author: "Bhavana Vijay"
+date: "August 9, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=10, fig.height=8) 
+```
+
+# Probability Practice
+## Part A
+
+$Prob(RC) = 0.3$
+
+$Prob(RC/Yes) = Prob(RC/No)=0.5$
+
+$Prob(TC) = 0.7$
+
+$Prob(Yes) = 0.65$
+
+$Prob(No) - 0.35$
+
+$Prob(TC/Yes) = ?$
+
+$Prob(Yes) = Prob(RC/Yes) * Prob(RC) + Prob(TC/Yes) * Prob(TC)$
+
+$0.65 = 0.5 * 0.3 + Prob(TC/Yes) * 0.7$
+
+$Prob(TC/Yes) = **`r (0.65-0.15)/0.7`**$
+
+#### Therefore, the fraction of people who are truthful clickers and answered yes is 0.71
+
+
+
+## Part B
+
+$Prob(Positive/Disease) = 0.993$
+
+$Prob(Negative/No Disease) = 0.9999$
+
+$Prob(Disease) = 0.000025$
+
+$Prob(Disease/Positive) =  Prob(Disease)*Prob(Positive/Disease)/[Prob(Disease)*Prob(Positive/Disease) + Prob(No Disease)*Prob(Positive/No Disease)$
+
+$Prob(Disease/Positve) = 0.000025*0.993/[0.000025*0.993 + (1-0.000025)*(1-0.9999)]$
+
+$Prob(Disease/Positve) = **`r (0.000025*0.993)/(0.000025*0.993 + (1-0.000025)*(1-0.9999))`**$
+
+#### Therefore, The probability of someone having a disease having tested positive is about 20%
+
+In implementing a universal testing policy, there might be problems as the test accurately testing a disease positive is only about 1/5ths. Hence, there are about 80% positive results that are false positives.
+
+
+
+# Market Segmentation
+
+```{r, echo=FALSE, message=FALSE}
+library(flexclust)
+library(ggplot2)
+library(reshape2)
+library(corrplot)
+library(corrgram)
+library(ggfortify)
+
+soc_mkt_all = read.csv("social_marketing.csv")
+```
+
+Lets do some exploratory data analysis by looking at correlations of the different types
+
+```{r}
+soc_mkt = soc_mkt_all[,-1]
+corr_mat = cor(soc_mkt)
+corrplot(corr_mat, type="lower")
+```
+
+Looking at the correlation plot, dots that are darker indicate a strong relationship.
+Results here, seem to be intuitive and in the right direction. The highest correlation is between Health-Nutrition and Personal Fitness, as they are related topics, tweeting about these topic is highly possible. There also seems to be high correlation between Cooking and Fashion, and Cooking and Beauty, which intuitively make sense. We observe a relationship between Online Gaming and College/University often occur together, as a lot of college students are interested in gaming this also conforms with human intuition.
+
+Now we can try our hand at clustering and confirm our hypothesis.
+
+#### Heirarchical Clustering
+
+```{r}
+
+soc_mkt_scaled <- scale(soc_mkt, center=TRUE, scale=TRUE)
+
+##Heirarchical Clustering ## 
+par(mfrow=c(2,2))
+# Form a pairwise distance matrix using the dist function
+distance_matrix = dist(soc_mkt_scaled, method='euclidean')
+
+# Now run hierarchical clustering
+hier_p = hclust(distance_matrix, method='average')
+cluster1 = cutree(hier_p, k=5)
+
+# Plot the dendrogram
+plot(hier_p, cex=0.8)
+
+# Now run hierarchical clustering
+hier_p = hclust(distance_matrix, method='centroid')
+cluster2 = cutree(hier_p, k=5)
+
+# Plot the dendrogram
+plot(hier_p, cex=0.8)
+
+# Now run hierarchical clustering
+hier_p = hclust(distance_matrix, method='complete')
+cluster3 = cutree(hier_p, k=10)
+
+# Plot the dendrogram
+plot(hier_p, cex=0.8)
+
+# Now run hierarchical clustering
+hier_p = hclust(distance_matrix, method='single')
+cluster4 = cutree(hier_p, k=5)
+
+# Plot the dendrogram
+plot(hier_p, cex=0.8)
+#ind =which(cluster1 == 3)
+summary(factor(cluster1))
+summary(factor(cluster2))
+summary(factor(cluster3))
+summary(factor(cluster4))
+
+```
+
+Hierarchical clustering results are hard to interpret and even after we cut the trees to 5. Hierarchical clustering for this data is not useful since there arent tiers or levels among the distribution and so it ends up grouping incorrectly into a single cluster only.
+
+Next lets try Principle Component Analysis
+
+#### PCA
+
+```{r}
+## PCA ## 
+
+pc1 = prcomp(as.matrix(soc_mkt_scaled), scale.=TRUE)
+#compute standard deviation of each principal component
+std_dev <- pc1$sdev
+#compute variance
+pr_var <- std_dev^2
+#proportion of variance explained
+prop_varex <- pr_var/sum(pr_var)
+par(mfrow=c(1,1))
+plot(cumsum(prop_varex), xlab = "Principal Component",
+             ylab = "Proportion of Variance Explained",
+             type = "b")
+
+loadings = pc1$rotation
+scores = pc1$x
+#autoplot(pc1,loadings=TRUE)
+autoplot(pc1, loadings = TRUE, loadings.colour = 'blue',
+         loadings.label = TRUE, loadings.label.size = 4) + theme_bw()
+
+```
+
+80% of the variance is explained by about 15 principle components. 
+50% of the variance is covered with just 6 PCs
+
+Next, we will try clustering and try to visualize these clusters using PCs to validate them.
+
+#### K-means
+
+```{r, echo=FALSE, message=FALSE}
+library(factoextra)
+library(cluster)
+library(NbClust)
+```
+
+We used elbow method for K-means to get the vaue of k that understands cluster composition.
+
+```{r}
+k.max <-20 # Maximal number of clusters
+wss <- sapply(1:k.max, 
+        function(k){kmeans(soc_mkt_scaled, k, nstart=10 )$tot.withinss})
+plot(1:k.max, wss,
+       type="b", pch = 19, frame = FALSE, 
+       xlab="Number of clusters K",
+       ylab="Total within-clusters sum of squares")
+```
+
+The elbow starts to tilt at about 8 clusters. That should be our answer. 
+
+Below we will look at 4 clusters first to see why lesser custers give us no good answer.
+
+**Trying with 4 clusters:**
+
+
+```{r}
+# K-means clustering with 4
+set.seed(1)
+km.res1 <- kmeans(soc_mkt_scaled, 4, nstart = 25)
+# k-means group number of each observation
+
+# Visualize k-means clusters
+fviz_cluster(km.res1, data = soc_mkt_scaled, geom = "point",
+             stand = FALSE, frame.type = "norm")
+
+
+clusters_pars = km.res1$centers
+transposed = t(clusters_pars)
+cluster_1 = transposed[which(abs(transposed[,1])>=0.4),1]
+cluster_2 = transposed[which(abs(transposed[,2])>=0.4),2]
+cluster_3 = transposed[which(abs(transposed[,3])>=0.4),3]
+cluster_4 = transposed[which(abs(transposed[,4])>=0.4),4]
+
+cat("\n")
+cluster_1
+cat("\n")
+cluster_2
+cat("\n")
+cluster_3
+cat("\n")
+cluster_4
+cat("\n")
+```
+```{r}
+fact_clust <- factor(km.res1$cluster)
+summary(fact_clust)
+```
+
+With 4 clusters, one cluster is getting grouped generally with very weak relationships to the center. This cluster has 4563 observations and that is 4563 observations which are wasted into a general group. We suspect this could be the influence of spam and chatter. To see more detailed clusters we will next see 8 clusters.
+
+#### Trying with 8 clusters to see if we can fine tune without over splitting
+
+```{r}
+
+# K-means clustering with 8
+set.seed(1)
+km.res <- kmeans(soc_mkt_scaled, 8, nstart = 25)
+# k-means group number of each observation
+
+# Visualize k-means clusters
+fviz_cluster(km.res, data = soc_mkt_scaled, geom = "point",
+             stand = FALSE,  frame.type = "norm")
+
+clusters_pars = km.res$centers
+transposed = t(clusters_pars)
+cluster_1 = transposed[which(abs(transposed[,1])>=0.5),1]
+cluster_2 = transposed[which(abs(transposed[,2])>=0.5),2]
+cluster_3 = transposed[which(abs(transposed[,3])>=0.5),3]
+cluster_4 = transposed[which(abs(transposed[,4])>=0.5),4]
+cluster_5 = transposed[which(abs(transposed[,5])>=0.5),5]
+cluster_6 = transposed[which(abs(transposed[,6])>=0.5),6]
+cluster_7 = transposed[which(abs(transposed[,7])>=0.5),7]
+cluster_8 = transposed[which(abs(transposed[,8])>=0.5),8]
+
+cat("\n")
+cluster_1
+cat("\n")
+cluster_2
+cat("\n")
+cluster_3
+cat("\n")
+cluster_4
+cat("\n")
+cluster_5
+cat("\n")
+cluster_6
+cat("\n")
+cluster_7
+cat("\n")
+cluster_8
+cat("\n")
+```
+
+
+```{r}
+fact_clust <- factor(km.res$cluster)
+summary(fact_clust)
+```
+
+The cluster composition we got from eight clusters makes sense intuitively and is interpretable. We earlier saw a huge cluster getting generalized. Here we again have a group of 3561 users who are not strongly biased or opinionated about any specific genre of topic. The clusters of 8 did do a good job singling out a spam and adult cluster from the more specific clusters which can do a good job with targetted marketing.
+
+
+Lets see our 8 clusters on the principle component scatter plots we saw earlier:
+
+```{r}
+
+par(mfrow=c(1,1))
+
+fact_clust <- factor(km.res$cluster)
+summary(fact_clust)
+
+ggplot(pc1,aes(x=pc1$x[,1],y=pc1$x[,2],col=fact_clust))+
+   geom_point(size=3,alpha=0.5)+
+   theme_bw()
+
+ggplot(pc1,aes(x=pc1$x[,2],y=pc1$x[,3],col=fact_clust))+
+   geom_point(size=3,alpha=0.5)+
+   theme_bw()
+```
+
+These scatterplots seem to confirm our clusters very well. 8 clusters seems to give us specific target groups by successfully removing the spammers into one of the clusters.
+
+
+In order to visualize these clusters and understand their prominent characteristics, we used word cloud. 
+```{r}
+# # A word cloud
+par(mfrow=c(3,3))
+library(wordcloud)
+
+#t(colnames(soc_mkt_scaled))
+colnames(soc_mkt_scaled)[19] <-"econ"
+colnames(soc_mkt_scaled)[25] <-"arts"
+for (i in 2:8) {
+wordcloud(colnames(soc_mkt_scaled), km.res$centers[i,], min.freq=0, max.words=100,scale=c(4,.4))
+}
+```
+
+### Conclusion
+
+We found 8 distinct clusters to be the best way to visualize these users and target them for marketing. 
+
+* Cluster 1 - 3561 users. These users tweet about everything or they are inactive. They dont specifically tweet about anything topical. We could use these customers along with any other cluster if more users are required in the campaign
+* Cluster 2 - 513 users. This cluster is a young female cluster. They are active on social media, they like beauty and fashion.
+* Cluster 3 - 617 users. This is a corporate male cluster. They are into computers, politics, news and they travel.
+* Cluster 4 - 801 users. These group of people are big outdoor enthusiasts. 
+* Cluster 5 - 368 users. Young college coing people who are into sports.
+* Cluster 6 - 1270 users. Seems like a young demographic that is into a bunch of stuff but mainly into shopping and being active of social media. This cluster can be grouped with cluster 2 for a bigger population of young users.
+* Cluster 7 - 49 users. Prominent spammers who talk alot about adult stuff.
+* Cluster 8 - 703 users. This is a typical parent group. Into religion, school, family and food. 
+
+
+
